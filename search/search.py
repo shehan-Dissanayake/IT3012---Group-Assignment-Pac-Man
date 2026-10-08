@@ -104,7 +104,37 @@ def depthFirstSearch(problem: SearchProblem):
 def breadthFirstSearch(problem: SearchProblem):
     """Search the shallowest nodes in the search tree first."""
     "*** YOUR CODE HERE ***"
-    util.raiseNotDefined()
+    # The fringe is a FIFO queue: the oldest (shallowest) node is expanded
+    # first. This is the only difference from DFS, which uses a LIFO Stack.
+    fringe = util.Queue()
+
+    # Each fringe entry is (state, path), where path is the list of actions
+    # that leads from the start state to that state.
+    fringe.push((problem.getStartState(), []))
+
+    # Graph search: remember expanded states so none is expanded twice.
+    expanded = set()
+
+    while not fringe.isEmpty():
+        # Take the shallowest node waiting on the fringe.
+        state, path = fringe.pop()
+
+        # Goal test when the node is popped: return the actions that reach it.
+        if problem.isGoalState(state):
+            return path
+
+        # Expand the state only if it has not been expanded before.
+        if state not in expanded:
+            expanded.add(state)
+
+            # Add every successor to the back of the queue, extending the
+            # path with the action that leads to it. stepCost is not needed
+            # because BFS counts steps, not cost.
+            for successor, action, stepCost in problem.getSuccessors(state):
+                fringe.push((successor, path + [action]))
+
+    # The fringe is empty and no goal was found: there is no solution.
+    return []
 
 def uniformCostSearch(problem: SearchProblem):
     """Search the node of least total cost first."""
