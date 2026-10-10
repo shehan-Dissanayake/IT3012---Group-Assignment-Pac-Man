@@ -476,8 +476,86 @@ def foodHeuristic(state: Tuple[Tuple, List[List]], problem: FoodSearchProblem):
     problem.heuristicInfo['wallCount']
     """
     position, foodGrid = state
-    "*** YOUR CODE HERE ***"
-    return 0
+
+    # *** Q7 — Eating All The Dots: Food Heuristic ***
+
+    # Get the list of remaining food positions
+    foodList = foodGrid.asList()
+
+    # No food left -> goal state, heuristic = 0
+    if not foodList:
+        return 0
+
+    # --------------------------------------------------------------------------
+    # Heuristic: MST over food dots (food-only Steiner tree lower bound)
+    #            + distance from Pacman to the nearest food dot.
+    #
+    # Admissibility:
+    #   Pacman must travel to some food dot first (≥ nearest food distance),
+    #   then connect all remaining food (≥ food-only MST weight).
+    #   Together these never exceed the true cost  →  admissible.
+    #
+    # Consistency:
+    #   - The food-only MST is a function purely of which food remain. It
+    #     decreases (by the edge that was "used") only when a food dot is eaten,
+    #     which costs ≥ 1 step. So ΔMST ≤ step cost.
+    #   - The "nearest food" term also satisfies the triangle inequality with
+    #     maze distances.
+    #   - Their sum is therefore consistent.
+    # --------------------------------------------------------------------------
+
+    # Lazy-initialize the maze-distance cache in heuristicInfo
+    if 'mazeDistCache' not in problem.heuristicInfo:
+        problem.heuristicInfo['mazeDistCache'] = {}
+
+    distCache = problem.heuristicInfo['mazeDistCache']
+    gameState = problem.startingGameState
+
+    def mazeDist(p1, p2):
+        """Return cached BFS maze distance between p1 and p2."""
+        # Canonical key so (A,B) and (B,A) share the same cache entry
+        if p1 <= p2:
+            key = (p1, p2)
+        else:
+            key = (p2, p1)
+        if key not in distCache:
+            distCache[key] = mazeDistance(p1, p2, gameState)
+        return distCache[key]
+
+    # --- Part 1: distance from Pacman to the nearest food dot ---
+    nearest_food_dist = min(mazeDist(position, f) for f in foodList)
+
+    # --- Part 2: MST over food dots only (Prim's algorithm) ---
+    n = len(foodList)
+    if n == 1:
+        # Only one dot left; MST weight = 0, cost is just nearest food dist
+        return nearest_food_dist
+
+    in_mst = [False] * n
+    min_edge = [float('inf')] * n
+
+    # Start Prim's from food index 0
+    min_edge[0] = 0
+    food_mst_weight = 0
+
+    for _ in range(n):
+        # Cheapest node not yet in MST
+        u = -1
+        for i in range(n):
+            if not in_mst[i] and (u == -1 or min_edge[i] < min_edge[u]):
+                u = i
+
+        in_mst[u] = True
+        food_mst_weight += min_edge[u]
+
+        # Relax neighbours
+        for v in range(n):
+            if not in_mst[v]:
+                d = mazeDist(foodList[u], foodList[v])
+                if d < min_edge[v]:
+                    min_edge[v] = d
+
+    return nearest_food_dist + food_mst_weight
 
 class ClosestDotSearchAgent(SearchAgent):
     "Search for all food using a sequence of searches"
